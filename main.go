@@ -1,28 +1,35 @@
 package main
 
 import (
-	"bytes"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"os/exec"
 )
 
-func serve(kill chan struct{}) {
+func serve(kill chan bool) {
 	log.Println("Serving...")
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header()["content-type"] = "text/plain"
-		w.Write(status())
+		w.Header()["content-type"] = []string{"text/plain"}
+		fmt.Fprint(w, status())
+	})
+
+	http.HandleFunc("/diff/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header()["content-type"] = []string{"text/plain"}
+		d := diff("develop")
+		fmt.Fprint(w, d)
 	})
 
 	http.HandleFunc("/kill", func(w http.ResponseWriter, r *http.Request) {
-		kill <- nil
+		close(kill)
 	})
 
-	http.ListenAndServe(":7777")
+	http.ListenAndServe(":7777", nil)
 }
 
-func status() string {
-	cmd := exec.Command("git", "status")
+func git(args ...string) string {
+	cmd := exec.Command("git", args...)
 
 	output, err := cmd.CombinedOutput()
 	if nil != err {
@@ -32,12 +39,32 @@ func status() string {
 	return string(output)
 }
 
+func status() string {
+	return git("status")
+}
+
+func diff(commit string) string {
+	return git("diff", "-M", commit)
+}
+
 func main() {
-	log.Println("Starting...")
-	kill := make(chan struct{})
+	kill := make(chan bool)
+
+	if len(os.Args) == 1 {
+		log.Println("No target...")
+	}
+
+	commit := os.Args[1]
 
 	go serve(kill)
+	go func() {
+		addr := fmt.Sprintf("http://localhost:7777/%s", commit)
+		log.Printf(`Opening "%s"`+"\n", addr)
+		cmd := exec.Command("xdg-open", addr)
+		cmd.Start()
+	}()
 
-	_ <- kill
+	for _ = range kill {
+	}
 	log.Println("Ending...")
 }
