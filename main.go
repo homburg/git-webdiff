@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
+	// "github.com/sergi/go-diff/diffmatchpatch"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 func serve(kill chan bool) {
@@ -13,6 +15,9 @@ func serve(kill chan bool) {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header()["content-type"] = []string{"text/plain"}
 		fmt.Fprint(w, status())
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "==================")
+		fmt.Fprintln(w, gitReadFile("develop", "README.md"))
 	})
 
 	http.HandleFunc("/diff/", func(w http.ResponseWriter, r *http.Request) {
@@ -25,7 +30,11 @@ func serve(kill chan bool) {
 		close(kill)
 	})
 
-	http.ListenAndServe(":7777", nil)
+	log.Println("Listening...")
+	err := http.ListenAndServe(":7777", nil)
+	if nil != err {
+		log.Fatal(err)
+	}
 }
 
 func git(args ...string) string {
@@ -47,7 +56,28 @@ func diff(commit string) string {
 	return git("diff", "-M", commit)
 }
 
+func gitCurrentBranch() string {
+	branchInfo := git("branch")
+
+	lines := strings.Split(branchInfo, "\n")
+	for _, line := range lines {
+		if line[0] == '*' {
+			return line[2:]
+		}
+	}
+	return ""
+}
+
+func gitReadFile(branch, filename string) string {
+	if branch == "" {
+		branch = gitCurrentBranch()
+	}
+
+	return git("show", fmt.Sprintf("%s:%s", branch, filename))
+}
+
 func main() {
+	log.Println("Starting...")
 	kill := make(chan bool)
 
 	if len(os.Args) == 1 {
@@ -58,7 +88,7 @@ func main() {
 
 	go serve(kill)
 	go func() {
-		addr := fmt.Sprintf("http://localhost:7777/%s", commit)
+		addr := fmt.Sprintf("http://localhost:7777/diff/%s", commit)
 		log.Printf(`Opening "%s"`+"\n", addr)
 		cmd := exec.Command("xdg-open", addr)
 		cmd.Start()
