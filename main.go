@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 	// "github.com/sergi/go-diff/diffmatchpatch"
+	"github.com/codegangsta/negroni"
+	"github.com/gorilla/mux"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -12,29 +15,44 @@ import (
 
 func serve(kill chan bool) {
 	log.Println("Serving...")
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header()["content-type"] = []string{"text/plain"}
-		fmt.Fprint(w, status())
-		fmt.Fprintln(w)
-		fmt.Fprintln(w, "==================")
-		fmt.Fprintln(w, gitReadFile("develop", "README.md"))
-	})
 
-	http.HandleFunc("/diff/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header()["content-type"] = []string{"text/plain"}
-		d := diff("develop")
-		fmt.Fprint(w, d)
-	})
-
-	http.HandleFunc("/kill", func(w http.ResponseWriter, r *http.Request) {
-		close(kill)
-	})
-
-	log.Println("Listening...")
-	err := http.ListenAndServe(":7777", nil)
+	baseFormatBytes, err := ioutil.ReadFile("public/base.html")
 	if nil != err {
 		log.Fatal(err)
 	}
+
+	baseFormat := string(baseFormatBytes)
+
+	r := mux.NewRouter()
+
+	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, baseFormat, "status...", "status...", status())
+	})
+
+	r.HandleFunc("/diff/{branch}", func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		branch := vars["branch"]
+		d := diff(branch)
+		fmt.Fprintf(w, baseFormat, branch, branch, d)
+	})
+
+	r.HandleFunc("/show/{branch}/{filename:.*}", func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		b := vars["branch"]
+		filename := vars["filename"]
+		w.Header()["x-filename"] = []string{filename}
+		fmt.Fprintf(w, baseFormat, filename, filename, gitReadFile(b, filename))
+	})
+
+	r.HandleFunc("/kill", func(w http.ResponseWriter, r *http.Request) {
+		close(kill)
+	})
+
+	n := negroni.Classic()
+	n.UseHandler(r)
+
+	log.Println("Listening...")
+	n.Run(":7777")
 }
 
 func git(args ...string) string {
