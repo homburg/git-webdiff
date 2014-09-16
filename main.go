@@ -48,6 +48,13 @@ func serve(kill chan bool) {
 		fmt.Fprintf(w, baseFormat, branch, branch, d)
 	})
 
+	r.HandleFunc("/diff/stat/{branch}", func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		branch := vars["branch"]
+		d := diffStat(branch)
+		fmt.Fprintf(w, baseFormat, branch, branch, d)
+	})
+
 	r.HandleFunc("/show/{branch}/{filename:.*}", func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		b := vars["branch"]
@@ -124,6 +131,10 @@ func status() string {
 
 func diff(commit string) string {
 	return git("diff", "-M", commit)
+}
+
+func diffStat(commit string) string {
+	return git("diff", "--stat", "-M", commit)
 }
 
 func gitCurrentBranch() string {
