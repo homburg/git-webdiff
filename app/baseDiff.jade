@@ -1,0 +1,47 @@
+doctype html
+head
+  title %s
+  link(rel="stylesheet", href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css")
+  link(rel="stylesheet", href="/hello.css")
+  script(type="text/javascript", src="vendor.js")
+  script.
+    var app = angular.module("Diff", []);
+    app.config(function ($locationProvider) {
+      $locationProvider.html5Mode(true);
+    }),
+    app.controller("DiffCtrl", function ($http, $location) {
+      console.log("location", $location.search());
+      var ctrl = {
+        getClass: function (type) {
+          if (type === -1) {
+            return "bg-danger";
+          }
+          if (type === 1) {
+            return "bg-success";
+          }
+          return "";
+        }
+      };
+      $http({method: "GET", url: "/split-diff.json", params: $location.search()}).then(function (val) {
+        console.log("response", val);
+        ctrl.diff = val.data;
+      });
+      return ctrl;
+    });
+body(ng-app="Diff", ng-controller="DiffCtrl as diff")
+  .container
+    .row: .col-md-12
+        h1 %s
+    .row: .col-md-12
+        div.code
+          span(ng-repeat="op in diff.diff", class="{{diff.getClass(op.Type)}}", ng-bind="op.Text")
+    .row: .col-md-12
+      pre %s
+    .row
+      .col-md-6
+        pre %s
+      .col-md-6
+        pre %s
+    .row
+      .col-md-12
+        pre(ng-bind="diff.diff | json")

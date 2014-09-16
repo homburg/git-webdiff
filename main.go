@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/codegangsta/negroni"
 	"github.com/gorilla/mux"
@@ -26,14 +27,14 @@ func serve(kill chan bool) {
 		log.Fatal(err)
 	}
 
-	baseColumnHeaderFormatBytes, err := ioutil.ReadFile("public/baseColumnsWithHeader.html")
+	baseDiffBytes, err := ioutil.ReadFile("public/baseDiff.html")
 	if nil != err {
 		log.Fatal(err)
 	}
 
 	baseFormat := string(baseFormatBytes)
-	baseColumnHeaderFormat := string(baseColumnHeaderFormatBytes)
 	baseColumnFormat := string(baseColumnFormatBytes)
+	baseDiff := string(baseDiffBytes)
 
 	r := mux.NewRouter()
 
@@ -63,7 +64,7 @@ func serve(kill chan bool) {
 		fmt.Fprintf(w, baseFormat, filename, filename, gitReadFile(b, filename))
 	})
 
-	r.HandleFunc("/split-diff/", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/split-diff", func(w http.ResponseWriter, r *http.Request) {
 		leftBranch := r.FormValue("leftBranch")
 		rightBranch := r.FormValue("rightBranch")
 		filename := r.FormValue("filename")
@@ -75,13 +76,30 @@ func serve(kill chan bool) {
 		rightFile := gitReadFile(rightBranch, filename)
 
 		fmt.Fprintf(w,
-			baseColumnHeaderFormat,
+			baseDiff,
 			title,
 			title,
 			diff.DiffMain(leftFile, rightFile, true),
 			leftFile,
 			rightFile,
 		)
+	})
+
+	r.HandleFunc("/split-diff.json", func(w http.ResponseWriter, r *http.Request) {
+		leftBranch := r.FormValue("leftBranch")
+		rightBranch := r.FormValue("rightBranch")
+		filename := r.FormValue("filename")
+
+		diff := diffmatchpatch.New()
+		leftFile := gitReadFile(leftBranch, filename)
+		rightFile := gitReadFile(rightBranch, filename)
+
+		json, err := json.Marshal(diff.DiffMain(leftFile, rightFile, true))
+		if nil != err {
+			w.WriteHeader(http.StatusNotFound)
+		}
+		w.Header()["content-type"] = []string{"application/json"}
+		w.Write(json)
 	})
 
 	r.HandleFunc("/split/", func(w http.ResponseWriter, r *http.Request) {

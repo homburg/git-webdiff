@@ -2,7 +2,7 @@
 
 .SUFFIXES:
 
-all: node_modules bower_components public/hello.js public/base.html public/baseColumns.html public/baseColumnsWithHeader.html public/vendor.js public/hello.css
+all: node_modules bower_components public/hello.js public/base.html public/baseColumns.html public/baseColumnsWithHeader.html public/baseDiff.html public/vendor.js public/hello.css
 
 run: git-webdiff all
 	./git-webdiff develop
