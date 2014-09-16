@@ -14,6 +14,11 @@ import (
 	"strings"
 )
 
+func diffStrings(text1, text2 string) []diffmatchpatch.Diff {
+	diff := diffmatchpatch.New()
+	return diff.DiffCleanupSemantic(diff.DiffMain(text1, text2, false))
+}
+
 func serve(kill chan bool) {
 	log.Println("Serving...")
 
@@ -71,7 +76,6 @@ func serve(kill chan bool) {
 
 		title := fmt.Sprintf("%s..%s -- %s", leftBranch, rightBranch, filename)
 
-		diff := diffmatchpatch.New()
 		leftFile := gitReadFile(leftBranch, filename)
 		rightFile := gitReadFile(rightBranch, filename)
 
@@ -79,7 +83,7 @@ func serve(kill chan bool) {
 			baseDiff,
 			title,
 			title,
-			diff.DiffMain(leftFile, rightFile, true),
+			diffStrings(leftFile, rightFile),
 			leftFile,
 			rightFile,
 		)
@@ -90,11 +94,10 @@ func serve(kill chan bool) {
 		rightBranch := r.FormValue("rightBranch")
 		filename := r.FormValue("filename")
 
-		diff := diffmatchpatch.New()
 		leftFile := gitReadFile(leftBranch, filename)
 		rightFile := gitReadFile(rightBranch, filename)
 
-		json, err := json.Marshal(diff.DiffMain(leftFile, rightFile, true))
+		json, err := json.Marshal(diffStrings(leftFile, rightFile))
 		if nil != err {
 			w.WriteHeader(http.StatusNotFound)
 		}
