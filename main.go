@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	// "github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/codegangsta/negroni"
 	"github.com/gorilla/mux"
+	"github.com/sergi/go-diff/diffmatchpatch"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -21,7 +21,19 @@ func serve(kill chan bool) {
 		log.Fatal(err)
 	}
 
+	baseColumnFormatBytes, err := ioutil.ReadFile("public/baseColumns.html")
+	if nil != err {
+		log.Fatal(err)
+	}
+
+	baseColumnHeaderFormatBytes, err := ioutil.ReadFile("public/baseColumnsWithHeader.html")
+	if nil != err {
+		log.Fatal(err)
+	}
+
 	baseFormat := string(baseFormatBytes)
+	baseColumnHeaderFormat := string(baseColumnHeaderFormatBytes)
+	baseColumnFormat := string(baseColumnFormatBytes)
 
 	r := mux.NewRouter()
 
@@ -42,6 +54,46 @@ func serve(kill chan bool) {
 		filename := vars["filename"]
 		w.Header()["x-filename"] = []string{filename}
 		fmt.Fprintf(w, baseFormat, filename, filename, gitReadFile(b, filename))
+	})
+
+	r.HandleFunc("/split-diff/", func(w http.ResponseWriter, r *http.Request) {
+		leftBranch := r.FormValue("leftBranch")
+		rightBranch := r.FormValue("rightBranch")
+		filename := r.FormValue("filename")
+
+		title := fmt.Sprintf("%s..%s -- %s", leftBranch, rightBranch, filename)
+
+		diff := diffmatchpatch.New()
+		leftFile := gitReadFile(leftBranch, filename)
+		rightFile := gitReadFile(rightBranch, filename)
+
+		fmt.Fprintf(w,
+			baseColumnHeaderFormat,
+			title,
+			title,
+			diff.DiffMain(leftFile, rightFile, true),
+			leftFile,
+			rightFile,
+		)
+	})
+
+	r.HandleFunc("/split/", func(w http.ResponseWriter, r *http.Request) {
+		leftBranch := r.FormValue("leftBranch")
+		rightBranch := r.FormValue("rightBranch")
+		filename := r.FormValue("filename")
+
+		title := fmt.Sprintf("%s..%s -- %s", leftBranch, rightBranch, filename)
+
+		leftFile := gitReadFile(leftBranch, filename)
+		rightFile := gitReadFile(rightBranch, filename)
+
+		fmt.Fprintf(w,
+			baseColumnFormat,
+			title,
+			title,
+			leftFile,
+			rightFile,
+		)
 	})
 
 	r.HandleFunc("/kill", func(w http.ResponseWriter, r *http.Request) {
