@@ -182,7 +182,7 @@ func main() {
 	log.Println("Starting...")
 	kill := make(chan bool)
 
-	if len(os.Args) == 1 {
+	if len(os.Args) == 0 {
 		log.Println("No target...")
 	}
 
